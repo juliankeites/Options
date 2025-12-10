@@ -92,108 +92,59 @@ def main():
     st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
     st.title("Oil Option Payoff, P&L and Greeks")
 
-    # Sidebar inputs
-    st.sidebar.header("Option inputs")
-
-    S = st.sidebar.number_input(
-        "Current oil price (S)", value=80.0, min_value=0.01, key="S_input"
-    )
-    K = st.sidebar.number_input(
-        "Strike (K)", value=80.0, min_value=0.01, key="K_input"
-    )
-    T_days = st.sidebar.number_input(
-        "Days to expiry", value=30, min_value=1, key="T_days_input"
-    )
-    sigma = (
-        st.sidebar.number_input(
-            "Volatility (annual, %)", value=30.0, min_value=1.0, key="sigma_input"
-        )
-        / 100.0
-    )
-    r = (
-        st.sidebar.number_input(
-            "Risk-free rate (annual, %)", value=0.0, key="r_input"
-        )
-        / 100.0
-    )
-    qty = st.sidebar.number_input(
-        "Quantity (bbl or lots)", value=1.0, min_value=0.01, key="qty_input"
-    )
-    option_side = st.sidebar.selectbox(
-        "Option type", ["Call", "Put"], key="option_side"
-    )
-    position = st.sidebar.selectbox(
-        "Position", ["Long", "Short"], key="position_side"
-    )
-    show_premium_line = st.sidebar.checkbox(
-        "Show premium vs underlying", value=True, key="show_premium_line"
+    # ---------- 1) Position summary banner ----------
+    moneyness = option_moneyness(S, K, opt_type)
+    moneyness_long = (
+        "In-the-money" if moneyness == "ITM"
+        else "At-the-money" if moneyness == "ATM"
+        else "Out-of-the-money"
     )
 
-    opt_type = "call" if option_side == "Call" else "put"
-    is_long = position == "Long"
-    T = T_days / 365.0
-    pos_sign = 1 if is_long else -1
-
-    # Zoom defaults
-    base_min = max(0.01, S * 0.2)
-    base_max = S * 2.0
-
-    st.sidebar.header("Zoom / axis range")
-    S_min_zoom = st.sidebar.slider(
-        "Min underlying on chart",
-        min_value=float(base_min),
-        max_value=float(base_max),
-        value=float(base_min),
-        key="zoom_min",
-    )
-    S_max_zoom = st.sidebar.slider(
-        "Max underlying on chart",
-        min_value=float(base_min),
-        max_value=float(base_max),
-        value=float(base_max),
-        key="zoom_max",
-    )
-    if S_max_zoom <= S_min_zoom:
-        S_max_zoom = S_min_zoom + 1e-6
-
-    # ---------- Pricing and Greeks (LONG option) ----------
-    res_long = bs_price_greeks(S, K, T, r, sigma, opt_type)
-    premium_per_unit_long = res_long["price"]
-
-    # Position Greeks = long Greeks * +1 (long) or -1 (short)
-    res_pos = {g: (val * pos_sign if g in ["delta", "gamma", "vega", "theta", "rho"] else val)
-               for g, val in res_long.items()}
-
-    signed_premium_per_unit_now = premium_per_unit_long * pos_sign
-    premium_total_now = signed_premium_per_unit_now * qty
-
-    intrinsic_now, time_val_now = intrinsic_and_time_value(
-        S, K, opt_type, premium_per_unit_long
+    st.markdown(
+        f"""
+        <div style="
+            display:flex;
+            flex-direction:row;
+            align-items:center;
+            justify-content:space-between;
+            padding:10px 14px;
+            margin-bottom:6px;
+            border-radius:6px;
+            background-color:#222222;
+            color:#ffffff;
+        ">
+          <div style="font-size:22px; font-weight:bold;">
+            {position} {option_side} @ {K:g}
+          </div>
+          <div style="font-size:16px;">
+            Spot: <b>{S:g}</b> &nbsp;|&nbsp;
+            Moneyness: <b>{moneyness}</b> ({moneyness_long})
+          </div>
+          <div style="font-size:14px;">
+            T: <b>{T_days:g} days</b> &nbsp;|&nbsp;
+            Vol: <b>{sigma*100:.2f}%</b>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.subheader("Premium, intrinsic and time value (per unit)")
-    c1, c2, c3 = st.columns(3)
-    c1.metric(
-        "Position premium (per unit)",
+    # ---------- 2) Premium / intrinsic / time value row ----------
+    st.markdown("### Premium details (per unit)")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(
+        "Position premium",
         f"{signed_premium_per_unit_now:.4f}",
         help="Positive = premium paid (long), negative = premium received (short).",
     )
-    c2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
-    c3.metric("Time value (long)", f"{time_val_now:.4f}")
+    col2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
+    col3.metric("Time value (long)", f"{time_val_now:.4f}")
+    col4.metric("Total position premium", f"{premium_total_now:.4f}")
 
-    st.write(
-        f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
-        f"**{premium_total_now:.4f}**"
-    )
-
-    moneyness = option_moneyness(S, K, opt_type)
-    st.markdown(
-        f"<div style='font-size:20px; font-weight:bold; color:#ffffff; "
-        f"background-color:#444444; padding:6px 10px; border-radius:4px; display:inline-block;'>"
-        f"This option is {moneyness} ("
-        f"{'In-the-money' if moneyness=='ITM' else 'At-the-money' if moneyness=='ATM' else 'Out-of-the-money'}"
-        f")</div>",
-        unsafe_allow_html=True,
+    st.caption(
+        f"Strike {K:g}, underlying {S:g}, {T_days:g} days to expiry, "
+        f"volatility {sigma*100:.2f}%."
     )
 
     # ---------- Payoff, P&L, premium vs underlying ----------
