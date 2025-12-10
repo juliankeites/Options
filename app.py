@@ -133,7 +133,6 @@ def main():
         min_value=float(base_min),
         max_value=float(base_max),
         value=float(base_min),
-        step=float((base_max - base_min) / 100.0),
         key="zoom_min",
     )
     S_max_zoom = st.sidebar.slider(
@@ -141,25 +140,31 @@ def main():
         min_value=float(base_min),
         max_value=float(base_max),
         value=float(base_max),
-        step=float((base_max - base_min) / 100.0),
         key="zoom_max",
     )
     if S_max_zoom <= S_min_zoom:
-        S_max_zoom = S_min_zoom + 1e-6  # avoid degenerate domain
+        S_max_zoom = S_min_zoom + 1e-6
 
     # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
-    premium_per_unit_now = res_now["price"]          # fair value per unit (same for long/short)
-    premium_total_now = premium_per_unit_now * qty
+    premium_per_unit_now = res_now["price"]          # always the long fair value per unit
+    # Signed premium for this position (positive = cash outflow for long, negative = inflow for short)
+    signed_premium_per_unit_now = premium_per_unit_now if is_long else -premium_per_unit_now
+
+    premium_total_now = signed_premium_per_unit_now * qty
     intrinsic_now, time_val_now = intrinsic_and_time_value(
         S, K, opt_type, premium_per_unit_now
     )
 
     st.subheader("Premium, intrinsic and time value (per unit)")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Model premium", f"{premium_per_unit_now:.4f}")
-    c2.metric("Intrinsic value", f"{intrinsic_now:.4f}")
-    c3.metric("Time value", f"{time_val_now:.4f}")
+    c1.metric(
+        "Position premium (per unit)",
+        f"{signed_premium_per_unit_now:.4f}",
+        help="Positive = premium paid (long), negative = premium received (short).",
+    )
+    c2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
+    c3.metric("Time value (long)", f"{time_val_now:.4f}")
     st.write(
         f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
         f"**{premium_total_now:.4f}**"
@@ -168,13 +173,14 @@ def main():
     # Payoff, P&L, premium vs underlying
     st.subheader("Payoff and P&L at expiry")
 
-    # Use a fine grid over the base range, but the chart will zoom to [S_min_zoom, S_max_zoom]
+    # Grid over base range, chart zooms via sliders
     S_grid = np.linspace(base_min, base_max, 400)
 
-    # Fair value (long premium) vs S on grid
-    premium_grid = np.array(
+    # Fair value (long premium) vs S on grid, then sign it for position
+    premium_grid_long = np.array(
         [bs_price_greeks(s_val, K, T, r, sigma, opt_type)["price"] for s_val in S_grid]
     )
+    premium_grid_signed = np.where(is_long, premium_grid_long, -premium_grid_long)
 
     # Long payoff, then convert to position payoff and P&L
     long_payoff = long_payoff_array(S_grid, K, opt_type, qty=qty)
@@ -187,13 +193,12 @@ def main():
     df = pd.DataFrame(
         {
             "S_expiry": S_grid,
-            "Position_payoff": position_payoff,   # long or short payoff
-            "PnL": pnl_expiry,                    # includes premium income/cost
-            "Premium": premium_grid * qty,        # fair value of LONG option vs S
+            "Position_payoff": position_payoff,        # long or short payoff
+            "PnL": pnl_expiry,                         # includes premium income/cost
+            "Premium_signed": premium_grid_signed * qty,  # position premium vs S (negative for shorts)
         }
     )
 
-    # Filter to zoom window for plotting (optional but keeps marks dense in view)
     df_zoom = df[(df["S_expiry"] >= S_min_zoom) & (df["S_expiry"] <= S_max_zoom)]
 
     base = alt.Chart(df_zoom).encode(
@@ -224,15 +229,15 @@ def main():
 
     if show_premium_line:
         premium_line = base.mark_line(color="green", strokeDash=[4, 2]).encode(
-            y=alt.Y("Premium", title="Long option fair value"),
+            y=alt.Y("Premium_signed", title="Position premium vs S"),
             tooltip=[
                 alt.Tooltip("S_expiry:Q", title="S"),
-                alt.Tooltip("Premium:Q", title="Long premium vs S"),
+                alt.Tooltip("Premium_signed:Q", title="Position premium vs S"),
             ],
         )
         layers.append(premium_line)
 
-    # Strike line within zoom domain
+    # Strike line
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
@@ -240,8 +245,7 @@ def main():
     )
     layers.append(strike_line)
 
-    # Arrow at current S on P&L curve, clipped to zoom window
-    # Use closest point on the *full* grid, but only draw if it sits in the zoom range
+    # Arrow at current S on P&L curve, if inside zoom window
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
@@ -273,7 +277,7 @@ def main():
                 x="x:Q",
                 y="y:Q",
                 text=alt.value(
-                    f"Premium now ({label_side}): {premium_per_unit_now:.4f}"
+                    f"Premium now ({label_side}): {signed_premium_per_unit_now:.4f}"
                 ),
             )
         )
@@ -282,13 +286,13 @@ def main():
     chart = alt.layer(*layers).properties(
         width=800,
         height=450,
-        title="Payoff (blue), P&L (orange), Premium (green) vs underlying",
+        title="Payoff (blue), P&L (orange), Position premium (green) vs underlying",
     )
 
     st.altair_chart(chart, use_container_width=True)
 
-    # Greeks table
-    st.subheader("Greeks (per unit at current underlying)")
+    # Greeks table (always per long option)
+    st.subheader("Greeks (per unit at current underlying, long option)")
     greeks_df = pd.DataFrame(
         {
             "Greek": ["Delta", "Gamma", "Vega", "Theta (per year)", "Rho"],
