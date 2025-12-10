@@ -5,9 +5,11 @@ import streamlit as st
 from math import log, sqrt, exp
 from scipy.stats import norm
 
-# --- Black–Scholes + Greeks ---
+# ---------- Black–Scholes + Greeks ----------
+
 def bs_price_greeks(S, K, T, r, sigma, option_type="call"):
-    if T <= 0 or sigma <= 0:
+    """Black–Scholes price and Greeks for European call/put (per unit)."""
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         return {
             "price": 0.0,
             "delta": 0.0,
@@ -24,22 +26,16 @@ def bs_price_greeks(S, K, T, r, sigma, option_type="call"):
         price = S * norm.cdf(d1) - K * exp(-r * T) * norm.cdf(d2)
         delta = norm.cdf(d1)
         rho = K * T * exp(-r * T) * norm.cdf(d2)
+        cum2 = norm.cdf(d2)
     else:
         price = K * exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
         delta = norm.cdf(d1) - 1
         rho = -K * T * exp(-r * T) * norm.cdf(-d2)
+        cum2 = norm.cdf(-d2)
 
     gamma = norm.pdf(d1) / (S * sigma * sqrt(T))
     vega = S * norm.pdf(d1) * sqrt(T)
-    theta = (
-        -S * norm.pdf(d1) * sigma / (2 * sqrt(T))
-        - (
-            r
-            * K
-            * exp(-r * T)
-            * (norm.cdf(d2) if option_type == "call" else norm.cdf(-d2))
-        )
-    )
+    theta = -S * norm.pdf(d1) * sigma / (2 * sqrt(T)) - r * K * exp(-r * T) * cum2
 
     return {
         "price": price,
@@ -52,6 +48,7 @@ def bs_price_greeks(S, K, T, r, sigma, option_type="call"):
 
 
 def intrinsic_and_time_value(S, K, option_type, model_price):
+    """Intrinsic and time value for a long option at current S."""
     if option_type == "call":
         intrinsic = max(S - K, 0.0)
     else:
@@ -60,28 +57,32 @@ def intrinsic_and_time_value(S, K, option_type, model_price):
     return intrinsic, time_value
 
 
-def payoff_array(S_grid, K, option_type, qty=1.0):
+def long_payoff_array(S_grid, K, option_type, qty=1.0):
+    """Long option payoff at expiry for each S on grid (per specified quantity)."""
     if option_type == "call":
         return np.maximum(S_grid - K, 0.0) * qty
     else:
         return np.maximum(K - S_grid, 0.0) * qty
 
 
-def pnl_array(payoff_expiry, premium_per_unit, qty=1.0, is_long=True):
+def pnl_from_long_payoff(long_payoff, premium_per_unit_now, qty=1.0, is_long=True):
     """
-    Payoff is always the intrinsic payoff of the option at expiry for the *long*.
-    Long P&L:  payoff - premium
-    Short P&L: -payoff + premium
+    P&L at expiry for chosen position:
+
+    long:  PnL = long_payoff - premium_now * qty
+    short: PnL = -long_payoff + premium_now * qty
     """
     sign = 1 if is_long else -1
-    return sign * payoff_expiry - sign * premium_per_unit * qty
+    return sign * long_payoff - sign * premium_per_unit_now * qty
 
+
+# ---------- Streamlit app ----------
 
 def main():
     st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
     st.title("Oil Option Payoff, P&L and Greeks")
 
-    # Sidebar inputs with explicit keys
+    # Sidebar inputs
     st.sidebar.header("Option inputs")
 
     S = st.sidebar.number_input(
@@ -122,7 +123,7 @@ def main():
     is_long = position == "Long"
     T = T_days / 365.0
 
-    # Pricing + Greeks at current underlying
+    # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
     premium_per_unit_now = res_now["price"]
     premium_total_now = premium_per_unit_now * qty
@@ -131,39 +132,41 @@ def main():
     )
 
     st.subheader("Premium, intrinsic and time value (per unit)")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Model premium", f"{premium_per_unit_now:.4f}")
-    col2.metric("Intrinsic value", f"{intrinsic_now:.4f}")
-    col3.metric("Time value", f"{time_val_now:.4f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Model premium", f"{premium_per_unit_now:.4f}")
+    c2.metric("Intrinsic value", f"{intrinsic_now:.4f}")
+    c3.metric("Time value", f"{time_val_now:.4f}")
     st.write(
         f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
         f"**{premium_total_now:.4f}**"
     )
 
-    # Payoff, P&L and premium vs underlying
+    # Payoff, P&L, premium vs underlying
     st.subheader("Payoff and P&L at expiry")
 
     S_min = max(0.01, S * 0.2)
     S_max = S * 2.0
     S_grid = np.linspace(S_min, S_max, 200)
 
-    # Premium vs underlying (value of a long option per unit)
+    # Fair value (long premium) vs S on grid
     premium_grid = np.array(
         [bs_price_greeks(s_val, K, T, r, sigma, opt_type)["price"] for s_val in S_grid]
     )
 
-    payoff_expiry = payoff_array(S_grid, K, opt_type, qty=qty)
-    # P&L is for your chosen position: long or short
-    pnl_expiry = pnl_array(
-        payoff_expiry, premium_per_unit_now, qty=qty, is_long=is_long
+    # Long payoff, then convert to position payoff and P&L
+    long_payoff = long_payoff_array(S_grid, K, opt_type, qty=qty)
+    position_sign = 1 if is_long else -1
+    position_payoff = position_sign * long_payoff
+    pnl_expiry = pnl_from_long_payoff(
+        long_payoff, premium_per_unit_now, qty=qty, is_long=is_long
     )
 
     df = pd.DataFrame(
         {
             "S_expiry": S_grid,
-            "Payoff": payoff_expiry,               # long payoff
-            "PnL": pnl_expiry,                     # net P&L long/short incl. premium
-            "Premium": premium_grid * qty,         # total premium vs S (long option value)
+            "Position_payoff": position_payoff,   # long or short payoff
+            "PnL": pnl_expiry,                    # includes premium income/cost
+            "Premium": premium_grid * qty,        # fair value of LONG option vs S
         }
     )
 
@@ -171,26 +174,34 @@ def main():
         x=alt.X("S_expiry", title="Underlying price at expiry")
     )
 
-    # Blue = long payoff shape (always long payoff, independent of position)
     payoff_line = base.mark_line(color="steelblue", strokeWidth=2).encode(
-        y=alt.Y("Payoff", title="Value")
+        y=alt.Y("Position_payoff", title="Value"),
+        tooltip=[
+            alt.Tooltip("S_expiry:Q", title="S at expiry"),
+            alt.Tooltip("Position_payoff:Q", title=f"{position} {option_side} payoff"),
+        ],
     )
 
-    # Orange = P&L for your position (long or short, incl. premium income/cost)
     pnl_line = base.mark_line(color="orange", strokeWidth=2).encode(
-        y="PnL"
+        y=alt.Y("PnL", title="P&L"),
+        tooltip=[
+            alt.Tooltip("S_expiry:Q", title="S at expiry"),
+            alt.Tooltip("PnL:Q", title=f"{position} {option_side} P&L"),
+        ],
     )
 
     layers = [payoff_line, pnl_line]
 
-    # Optional premium curve (value of long option vs S)
     if show_premium_line:
         premium_line = base.mark_line(color="green", strokeDash=[4, 2]).encode(
-            y="Premium"
+            y=alt.Y("Premium", title="Long option fair value"),
+            tooltip=[
+                alt.Tooltip("S_expiry:Q", title="S"),
+                alt.Tooltip("Premium:Q", title="Long premium vs S"),
+            ],
         )
         layers.append(premium_line)
 
-    # Vertical strike line
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
@@ -198,7 +209,7 @@ def main():
     )
     layers.append(strike_line)
 
-    # Arrow marker at current underlying on P&L curve
+    # Arrow at current S on P&L curve
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
@@ -215,7 +226,7 @@ def main():
             y="PnL_now:Q",
             tooltip=[
                 alt.Tooltip("S_now:Q", title="Underlying now"),
-                alt.Tooltip("PnL_now:Q", title="PnL at expiry"),
+                alt.Tooltip("PnL_now:Q", title="P&L at expiry"),
             ],
         )
     )
@@ -227,7 +238,7 @@ def main():
         .encode(
             x="x:Q",
             y="y:Q",
-            text=alt.value(f"Premium now: {premium_per_unit_now:.4f}"),
+            text=alt.value(f"Premium now (long): {premium_per_unit_now:.4f}"),
         )
     )
     layers.append(premium_label)
@@ -240,7 +251,7 @@ def main():
 
     st.altair_chart(chart, use_container_width=True)
 
-    # Greeks table at current underlying
+    # Greeks table
     st.subheader("Greeks (per unit at current underlying)")
     greeks_df = pd.DataFrame(
         {
