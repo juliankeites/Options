@@ -272,7 +272,7 @@ def main():
         label_side = "long" if is_long else "short"
         premium_label = (
             alt.Chart(pd.DataFrame({"x": [S_now], "y": [pnl_now]}))
-            .mark_text(align="left", dx=5, dy=-50, color="White")
+            .mark_text(align="left", dx=50, dy=-10, color="White")
             .encode(
                 x="x:Q",
                 y="y:Q",
