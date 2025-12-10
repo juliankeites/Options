@@ -92,6 +92,87 @@ def main():
     st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
     st.title("Oil Option Payoff, P&L and Greeks")
 
+    # Sidebar inputs
+    st.sidebar.header("Option inputs")
+
+    S = st.sidebar.number_input(
+        "Current oil price (S)", value=80.0, min_value=0.01, key="S_input"
+    )
+    K = st.sidebar.number_input(
+        "Strike (K)", value=80.0, min_value=0.01, key="K_input"
+    )
+    T_days = st.sidebar.number_input(
+        "Days to expiry", value=30, min_value=1, key="T_days_input"
+    )
+    sigma = (
+        st.sidebar.number_input(
+            "Volatility (annual, %)", value=30.0, min_value=1.0, key="sigma_input"
+        )
+        / 100.0
+    )
+    r = (
+        st.sidebar.number_input(
+            "Risk-free rate (annual, %)", value=0.0, key="r_input"
+        )
+        / 100.0
+    )
+    qty = st.sidebar.number_input(
+        "Quantity (bbl or lots)", value=1.0, min_value=0.01, key="qty_input"
+    )
+    option_side = st.sidebar.selectbox(
+        "Option type", ["Call", "Put"], key="option_side"
+    )
+    position = st.sidebar.selectbox(
+        "Position", ["Long", "Short"], key="position_side"
+    )
+    show_premium_line = st.sidebar.checkbox(
+        "Show premium vs underlying", value=True, key="show_premium_line"
+    )
+
+    opt_type = "call" if option_side == "Call" else "put"
+    is_long = position == "Long"
+    pos_sign = 1 if is_long else -1
+    T = T_days / 365.0
+
+    # Zoom defaults
+    base_min = max(0.01, S * 0.2)
+    base_max = S * 2.0
+
+    st.sidebar.header("Zoom / axis range")
+    S_min_zoom = st.sidebar.slider(
+        "Min underlying on chart",
+        min_value=float(base_min),
+        max_value=float(base_max),
+        value=float(base_min),
+        key="zoom_min",
+    )
+    S_max_zoom = st.sidebar.slider(
+        "Max underlying on chart",
+        min_value=float(base_min),
+        max_value=float(base_max),
+        value=float(base_max),
+        key="zoom_max",
+    )
+    if S_max_zoom <= S_min_zoom:
+        S_max_zoom = S_min_zoom + 1e-6
+
+    # ---------- Pricing and Greeks (LONG option) ----------
+    res_long = bs_price_greeks(S, K, T, r, sigma, opt_type)
+    premium_per_unit_long = res_long["price"]
+
+    # Position Greeks = long Greeks * +1 (long) or -1 (short)
+    res_pos = {
+        key: (val * pos_sign if key in ["delta", "gamma", "vega", "theta", "rho"] else val)
+        for key, val in res_long.items()
+    }
+
+    signed_premium_per_unit_now = premium_per_unit_long * pos_sign
+    premium_total_now = signed_premium_per_unit_now * qty
+
+    intrinsic_now, time_val_now = intrinsic_and_time_value(
+        S, K, opt_type, premium_per_unit_long
+    )
+
     # ---------- 1) Position summary banner ----------
     moneyness = option_moneyness(S, K, opt_type)
     moneyness_long = (
@@ -122,25 +203,26 @@ def main():
           </div>
           <div style="font-size:14px;">
             T: <b>{T_days:g} days</b> &nbsp;|&nbsp;
-            Vol: <b>{sigma*100:.2f}%</b>
+            Vol: <b>{sigma*100:.2f}%</b> &nbsp;|&nbsp;
+            r: <b>{r*100:.2f}%</b>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ---------- 2) Premium / intrinsic / time value row ----------
+    # ---------- 2) Premium block ----------
     st.markdown("### Premium details (per unit)")
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric(
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
         "Position premium",
         f"{signed_premium_per_unit_now:.4f}",
         help="Positive = premium paid (long), negative = premium received (short).",
     )
-    col2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
-    col3.metric("Time value (long)", f"{time_val_now:.4f}")
-    col4.metric("Total position premium", f"{premium_total_now:.4f}")
+    c2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
+    c3.metric("Time value (long)", f"{time_val_now:.4f}")
+    c4.metric("Total position premium", f"{premium_total_now:.4f}")
 
     st.caption(
         f"Strike {K:g}, underlying {S:g}, {T_days:g} days to expiry, "
@@ -290,8 +372,8 @@ def main():
         {
             "Greek": ["Delta", "Gamma", "Vega", "Theta", "Rho"],
             "Explanation": [
-                f"Delta = {delta_val:.4f}. Approximate change in P&L for a 1-unit move in the underlying, "
-                f"for this {position} {option_side} position.",
+                f"Delta = {delta_val:.4f}. Approximate change in P&L for a 1-unit move in "
+                f"the underlying, for this {position} {option_side} position.",
                 f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying.",
                 f"Vega = {vega_val:.4f}. Sensitivity of this position's value to volatility "
                 f"(per 1.00 = 100 vol points). Per 1 vol point ≈ {vega_val/100.0:.4f}.",
