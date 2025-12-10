@@ -295,7 +295,7 @@ def main():
     st.subheader("Greeks (per unit at current underlying, long option)")
     greeks_df = pd.DataFrame(
         {
-            "Greek": ["Delta", "Gamma", "Vega", "Theta (per year)", "Rho"],
+            "Greek": ["Delta - sensitivity of the option price to a 1‑unit move in the underlying price", "Gamma - the rate of change of delta with respect to the underlying price.", "Vega - sensitivity of the option price to volatility (vega ≈ 26.76 (per 1.00 = 100‑point change in vol), a 1 percentage‑point increase in implied volatility (e.g. 26.5% → 27.5%) changes the option value by about 0.2676)", "Theta (per year) -sensitivity of the option price to the passage of time, holding everything else constant", "Rho"],
             "Value": [
                 res_now["delta"],
                 res_now["gamma"],
