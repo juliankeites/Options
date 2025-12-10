@@ -291,11 +291,12 @@ def main():
 
     st.altair_chart(chart, use_container_width=True)
 
-    # Greeks table (always per long option)
+    # ---------- Greeks numeric table ----------
     st.subheader("Greeks (per unit at current underlying, long option)")
+
     greeks_df = pd.DataFrame(
         {
-            "Greek": ["Delta - sensitivity of the option price to a 1‑unit move in the underlying price. A delta of 0.5526 means if the underlying goes up by 1 (e.g. from 67.77 to 68.77), the option’s theoretical value increases by about 0.55.​ It also means this call behaves like being long roughly 0.55 barrels (or units) of the underlying per option", "Gamma - the rate of change of delta with respect to the underlying price.", "Vega - sensitivity of the option price to volatility (vega ≈ 26.76 (per 1.00 = 100‑point change in vol), a 1 percentage‑point increase in implied volatility (e.g. 26.5% → 27.5%) changes the option value by about 0.2676)", "Theta (per year) -sensitivity of the option price to the passage of time, holding everything else constant", "Rho - −3.5560 per year means that over a year of pure time decay the option would lose about 3.56 of value; per day this is roughly −0.0097 (3.5560/365)"],
+            "Greek": ["Delta", "Gamma", "Vega", "Theta (per year)", "Rho"],
             "Value": [
                 res_now["delta"],
                 res_now["gamma"],
@@ -305,29 +306,62 @@ def main():
             ],
         }
     )
-    # Style for wrapping + smaller font
-    st.markdown(
-    """
-    <style>
-    .greeks-table {
-        font-size: 11px;
-        border-collapse: collapse;
-        width: 100%;
-    }
-    .greeks-table th, .greeks-table td {
-        border: 1px solid #ddd;
-        padding: 4px 6px;
-        white-space: normal;      /* allow wrapping */
-        word-wrap: break-word;    /* break long strings if needed */
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
+    st.table(greeks_df)
+
+    # ---------- Greeks explanation table ----------
+    # Build text with current values interpolated
+    delta_val = res_now["delta"]
+    gamma_val = res_now["gamma"]
+    vega_val = res_now["vega"]
+    theta_val = res_now["theta"]
+    rho_val = res_now["rho"]
+
+    expl_df = pd.DataFrame(
+        {
+            "Greek": ["Delta", "Gamma", "Vega", "Theta", "Rho"],
+            "Explanation": [
+                f"Delta = {delta_val:.4f}. Approximate change in option value "
+                f"for a 1-unit move in the underlying price. For example, if the underlying moves up by 1, "
+                f"the option value changes by about {delta_val:.4f}.",
+                f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying. "
+                f"A 1-unit move in the underlying changes delta by about {gamma_val:.4f}.",
+                f"Vega = {vega_val:.4f}. Sensitivity of option value to volatility. "
+                f"A 1 percentage-point increase in implied volatility changes the option value by roughly "
+                f"{vega_val/100.0:.4f} (per 1 vol point).",
+                f"Theta = {theta_val:.4f} per year. Sensitivity of option value to the passage of time, "
+                f"holding other inputs constant. Per day this is about {theta_val/365.0:.4f}.",
+                f"Rho = {rho_val:.4f}. Sensitivity of option value to the risk-free interest rate. "
+                f"A 1 percentage-point increase in the rate changes the option value by roughly "
+                f"{rho_val/100.0:.4f}.",
+            ],
+        }
     )
 
+    # CSS for wrapping explanation text
     st.markdown(
-    greeks_df.to_html(classes="greeks-table", index=False),
-    unsafe_allow_html=True,
+        """
+        <style>
+        .greeks-expl-table {
+            font-size: 11px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .greeks-expl-table th, .greeks-expl-table td {
+            border: 1px solid #ddd;
+            padding: 4px 6px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
+
+    st.subheader("Greeks explanation")
+    st.markdown(
+        expl_df.to_html(classes="greeks-expl-table", index=False),
+        unsafe_allow_html=True,
+    )
+
 if __name__ == "__main__":
     main()
