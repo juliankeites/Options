@@ -125,7 +125,7 @@ def main():
 
     # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
-    premium_per_unit_now = res_now["price"]
+    premium_per_unit_now = res_now["price"]          # fair value per unit (same for long/short)
     premium_total_now = premium_per_unit_now * qty
     intrinsic_now, time_val_now = intrinsic_and_time_value(
         S, K, opt_type, premium_per_unit_now
@@ -202,6 +202,7 @@ def main():
         )
         layers.append(premium_line)
 
+    # Strike line
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
@@ -232,13 +233,15 @@ def main():
     )
     layers.append(arrow_point)
 
+    # Annotation text – wording depends on long/short, number is always the same fair value
+    label_side = "long" if is_long else "short"
     premium_label = (
         alt.Chart(pd.DataFrame({"x": [S_now], "y": [pnl_now]}))
         .mark_text(align="left", dx=5, dy=-10, color="black")
         .encode(
             x="x:Q",
             y="y:Q",
-            text=alt.value(f"Premium now (long): {premium_per_unit_now:.4f}"),
+            text=alt.value(f"Premium now ({label_side}): {premium_per_unit_now:.4f}"),
         )
     )
     layers.append(premium_label)
