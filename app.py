@@ -329,8 +329,8 @@ def main():
                 f"A 1 percentage-point increase in implied volatility changes the option value by roughly "
                 f"{vega_val/100.0:.4f} (per 1 vol point).",
                 f"Theta = {theta_val:.4f} per year. Sensitivity of option value to the passage of time, "
-                f"holding other inputs constant. Per day this is about {theta_val/365.0:.4f}.",
-                f"Rho = {rho_val:.4f}. Sensitivity of option value to the risk-free interest rate. "
+                f"holding other inputs constant. Per day (divide Theta by 365) this is about {theta_val/365.0:.4f}.",
+                f"Rho = {rho_val:.4f}. Sensitivity of option value to the risk-free interest rate, Not valid on Options on Forwards. "
                 f"A 1 percentage-point increase in the rate changes the option value by roughly "
                 f"{rho_val/100.0:.4f}.",
             ],
