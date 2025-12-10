@@ -295,7 +295,7 @@ def main():
     st.subheader("Greeks (per unit at current underlying, long option)")
     greeks_df = pd.DataFrame(
         {
-            "Greek": ["Delta - sensitivity of the option price to a 1‑unit move in the underlying price", "Gamma - the rate of change of delta with respect to the underlying price.", "Vega - sensitivity of the option price to volatility (vega ≈ 26.76 (per 1.00 = 100‑point change in vol), a 1 percentage‑point increase in implied volatility (e.g. 26.5% → 27.5%) changes the option value by about 0.2676)", "Theta (per year) -sensitivity of the option price to the passage of time, holding everything else constant", "Rho"],
+            "Greek": ["Delta - sensitivity of the option price to a 1‑unit move in the underlying price. A delta of 0.5526 means if the underlying goes up by 1 (e.g. from 67.77 to 68.77), the option’s theoretical value increases by about 0.55.​ It also means this call behaves like being long roughly 0.55 barrels (or units) of the underlying per option", "Gamma - the rate of change of delta with respect to the underlying price.", "Vega - sensitivity of the option price to volatility (vega ≈ 26.76 (per 1.00 = 100‑point change in vol), a 1 percentage‑point increase in implied volatility (e.g. 26.5% → 27.5%) changes the option value by about 0.2676)", "Theta (per year) -sensitivity of the option price to the passage of time, holding everything else constant", "Rho - −3.5560 per year means that over a year of pure time decay the option would lose about 3.56 of value; per day this is roughly −0.0097 (3.5560/365)"],
             "Value": [
                 res_now["delta"],
                 res_now["gamma"],
