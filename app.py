@@ -254,7 +254,7 @@ def main():
         arrow_point = (
             alt.Chart(pd.DataFrame({"S_now": [S_now], "PnL_now": [pnl_now]}))
             .mark_point(
-                color="black",
+                color="white",
                 size=80,
                 shape="triangle-up" if is_long else "triangle-down",
             )
