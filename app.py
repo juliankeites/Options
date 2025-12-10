@@ -169,22 +169,7 @@ def main():
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
     premium_per_unit_now = res_now["price"]          # always the long fair value per unit
 
-    st.write(
-    f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
-    f"**{premium_total_now:.4f}**"
-    )
-
-    # --- Option moneyness banner ---
-    moneyness = option_moneyness(S, K, opt_type)
-    st.markdown(
-        f"<div style='font-size:20px; font-weight:bold; color:#ffffff; "
-        f"background-color:#444444; padding:6px 10px; "
-        f"border-radius:4px; display:inline-block;'>"
-        f"This option is {moneyness} ("
-        f"{'In-the-money' if moneyness=='ITM' else 'At-the-money' if moneyness=='ATM' else 'Out-of-the-money'}"
-        f")</div>",
-        unsafe_allow_html=True,
-    )
+  
 
     # Signed premium for this position (positive = cash outflow for long, negative = inflow for short)
     signed_premium_per_unit_now = premium_per_unit_now if is_long else -premium_per_unit_now
