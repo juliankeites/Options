@@ -123,6 +123,30 @@ def main():
     is_long = position == "Long"
     T = T_days / 365.0
 
+    # Default grid range for zoom sliders
+    base_min = max(0.01, S * 0.2)
+    base_max = S * 2.0
+
+    st.sidebar.header("Zoom / axis range")
+    S_min_zoom = st.sidebar.slider(
+        "Min underlying on chart",
+        min_value=float(base_min),
+        max_value=float(base_max),
+        value=float(base_min),
+        step=float((base_max - base_min) / 100.0),
+        key="zoom_min",
+    )
+    S_max_zoom = st.sidebar.slider(
+        "Max underlying on chart",
+        min_value=float(base_min),
+        max_value=float(base_max),
+        value=float(base_max),
+        step=float((base_max - base_min) / 100.0),
+        key="zoom_max",
+    )
+    if S_max_zoom <= S_min_zoom:
+        S_max_zoom = S_min_zoom + 1e-6  # avoid degenerate domain
+
     # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
     premium_per_unit_now = res_now["price"]          # fair value per unit (same for long/short)
@@ -144,9 +168,8 @@ def main():
     # Payoff, P&L, premium vs underlying
     st.subheader("Payoff and P&L at expiry")
 
-    S_min = max(0.01, S * 0.2)
-    S_max = S * 2.0
-    S_grid = np.linspace(S_min, S_max, 200)
+    # Use a fine grid over the base range, but the chart will zoom to [S_min_zoom, S_max_zoom]
+    S_grid = np.linspace(base_min, base_max, 400)
 
     # Fair value (long premium) vs S on grid
     premium_grid = np.array(
@@ -170,8 +193,15 @@ def main():
         }
     )
 
-    base = alt.Chart(df).encode(
-        x=alt.X("S_expiry", title="Underlying price at expiry")
+    # Filter to zoom window for plotting (optional but keeps marks dense in view)
+    df_zoom = df[(df["S_expiry"] >= S_min_zoom) & (df["S_expiry"] <= S_max_zoom)]
+
+    base = alt.Chart(df_zoom).encode(
+        x=alt.X(
+            "S_expiry",
+            title="Underlying price at expiry",
+            scale=alt.Scale(domain=[S_min_zoom, S_max_zoom]),
+        )
     )
 
     payoff_line = base.mark_line(color="steelblue", strokeWidth=2).encode(
@@ -202,49 +232,52 @@ def main():
         )
         layers.append(premium_line)
 
-    # Strike line
+    # Strike line within zoom domain
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
-        .encode(x="K:Q")
+        .encode(x=alt.X("K:Q", scale=alt.Scale(domain=[S_min_zoom, S_max_zoom])))
     )
     layers.append(strike_line)
 
-    # Arrow at current S on P&L curve
+    # Arrow at current S on P&L curve, clipped to zoom window
+    # Use closest point on the *full* grid, but only draw if it sits in the zoom range
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
 
-    arrow_point = (
-        alt.Chart(pd.DataFrame({"S_now": [S_now], "PnL_now": [pnl_now]}))
-        .mark_point(
-            color="black",
-            size=80,
-            shape="triangle-up" if is_long else "triangle-down",
+    if S_min_zoom <= S_now <= S_max_zoom:
+        arrow_point = (
+            alt.Chart(pd.DataFrame({"S_now": [S_now], "PnL_now": [pnl_now]}))
+            .mark_point(
+                color="black",
+                size=80,
+                shape="triangle-up" if is_long else "triangle-down",
+            )
+            .encode(
+                x="S_now:Q",
+                y="PnL_now:Q",
+                tooltip=[
+                    alt.Tooltip("S_now:Q", title="Underlying now"),
+                    alt.Tooltip("PnL_now:Q", title="P&L at expiry"),
+                ],
+            )
         )
-        .encode(
-            x="S_now:Q",
-            y="PnL_now:Q",
-            tooltip=[
-                alt.Tooltip("S_now:Q", title="Underlying now"),
-                alt.Tooltip("PnL_now:Q", title="P&L at expiry"),
-            ],
-        )
-    )
-    layers.append(arrow_point)
+        layers.append(arrow_point)
 
-    # Annotation text – wording depends on long/short, number is always the same fair value
-    label_side = "long" if is_long else "short"
-    premium_label = (
-        alt.Chart(pd.DataFrame({"x": [S_now], "y": [pnl_now]}))
-        .mark_text(align="left", dx=5, dy=-10, color="black")
-        .encode(
-            x="x:Q",
-            y="y:Q",
-            text=alt.value(f"Premium now ({label_side}): {premium_per_unit_now:.4f}"),
+        label_side = "long" if is_long else "short"
+        premium_label = (
+            alt.Chart(pd.DataFrame({"x": [S_now], "y": [pnl_now]}))
+            .mark_text(align="left", dx=5, dy=-10, color="black")
+            .encode(
+                x="x:Q",
+                y="y:Q",
+                text=alt.value(
+                    f"Premium now ({label_side}): {premium_per_unit_now:.4f}"
+                ),
+            )
         )
-    )
-    layers.append(premium_label)
+        layers.append(premium_label)
 
     chart = alt.layer(*layers).properties(
         width=800,
