@@ -165,16 +165,17 @@ def main():
     if S_max_zoom <= S_min_zoom:
         S_max_zoom = S_min_zoom + 1e-6
 
-    # Current price, intrinsic, time value, Greeks
+      # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
-    premium_per_unit_now = res_now["price"]          # always the long fair value per unit
+    premium_per_unit_now = res_now["price"]          # fair long premium per unit
 
-  
-
-    # Signed premium for this position (positive = cash outflow for long, negative = inflow for short)
-    signed_premium_per_unit_now = premium_per_unit_now if is_long else -premium_per_unit_now
+    # Signed premium for this position (positive = paid for long, negative = received for short)
+    signed_premium_per_unit_now = (
+        premium_per_unit_now if is_long else -premium_per_unit_now
+    )
 
     premium_total_now = signed_premium_per_unit_now * qty
+
     intrinsic_now, time_val_now = intrinsic_and_time_value(
         S, K, opt_type, premium_per_unit_now
     )
@@ -188,10 +189,23 @@ def main():
     )
     c2.metric("Intrinsic value (long)", f"{intrinsic_now:.4f}")
     c3.metric("Time value (long)", f"{time_val_now:.4f}")
+
     st.write(
         f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
         f"**{premium_total_now:.4f}**"
     )
+
+    # --- Option moneyness banner (inserted immediately after the st.write) ---
+    moneyness = option_moneyness(S, K, opt_type)
+    st.markdown(
+        f"<div style='font-size:20px; font-weight:bold; color:#ffffff; "
+        f"background-color:#444444; padding:6px 10px; border-radius:4px; display:inline-block;'>"
+        f"This option is {moneyness} ("
+        f"{'In-the-money' if moneyness=='ITM' else 'At-the-money' if moneyness=='ATM' else 'Out-of-the-money'}"
+        f")</div>",
+        unsafe_allow_html=True,
+    )
+
 
     # Payoff, P&L, premium vs underlying
     st.subheader("Payoff and P&L at expiry")
