@@ -305,8 +305,29 @@ def main():
             ],
         }
     )
-    st.table(greeks_df)
+    # Style for wrapping + smaller font
+    st.markdown(
+    """
+    <style>
+    .greeks-table {
+        font-size: 11px;
+        border-collapse: collapse;
+        width: 100%;
+    }
+    .greeks-table th, .greeks-table td {
+        border: 1px solid #ddd;
+        padding: 4px 6px;
+        white-space: normal;      /* allow wrapping */
+        word-wrap: break-word;    /* break long strings if needed */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+    )
 
-
+    st.markdown(
+    greeks_df.to_html(classes="greeks-table", index=False),
+    unsafe_allow_html=True,
+    )
 if __name__ == "__main__":
     main()
