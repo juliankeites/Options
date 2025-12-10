@@ -8,7 +8,7 @@ from scipy.stats import norm
 # ---------- Black–Scholes + Greeks ----------
 
 def bs_price_greeks(S, K, T, r, sigma, option_type="call"):
-    """Black–Scholes price and Greeks for European call/put (per unit)."""
+    """Black–Scholes price and Greeks for European call/put (LONG option, per unit)."""
     if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         return {
             "price": 0.0,
@@ -48,7 +48,6 @@ def bs_price_greeks(S, K, T, r, sigma, option_type="call"):
 
 
 def intrinsic_and_time_value(S, K, option_type, model_price):
-    """Intrinsic and time value for a long option at current S."""
     if option_type == "call":
         intrinsic = max(S - K, 0.0)
     else:
@@ -56,12 +55,9 @@ def intrinsic_and_time_value(S, K, option_type, model_price):
     time_value = max(model_price - intrinsic, 0.0)
     return intrinsic, time_value
 
+
 def option_moneyness(S, K, option_type):
-    """
-    Return 'ITM', 'ATM', or 'OTM' for the current option.
-    option_type: 'call' or 'put'
-    """
-    eps = 1e-6  # small tolerance
+    eps = 1e-6
     if option_type == "call":
         if S > K + eps:
             return "ITM"
@@ -69,7 +65,7 @@ def option_moneyness(S, K, option_type):
             return "ATM"
         else:
             return "OTM"
-    else:  # put
+    else:
         if S < K - eps:
             return "ITM"
         elif abs(S - K) <= eps:
@@ -77,8 +73,8 @@ def option_moneyness(S, K, option_type):
         else:
             return "OTM"
 
+
 def long_payoff_array(S_grid, K, option_type, qty=1.0):
-    """Long option payoff at expiry for each S on grid (per specified quantity)."""
     if option_type == "call":
         return np.maximum(S_grid - K, 0.0) * qty
     else:
@@ -86,12 +82,6 @@ def long_payoff_array(S_grid, K, option_type, qty=1.0):
 
 
 def pnl_from_long_payoff(long_payoff, premium_per_unit_now, qty=1.0, is_long=True):
-    """
-    P&L at expiry for chosen position:
-
-    long:  PnL = long_payoff - premium_now * qty
-    short: PnL = -long_payoff + premium_now * qty
-    """
     sign = 1 if is_long else -1
     return sign * long_payoff - sign * premium_per_unit_now * qty
 
@@ -142,8 +132,9 @@ def main():
     opt_type = "call" if option_side == "Call" else "put"
     is_long = position == "Long"
     T = T_days / 365.0
+    pos_sign = 1 if is_long else -1
 
-    # Default grid range for zoom sliders
+    # Zoom defaults
     base_min = max(0.01, S * 0.2)
     base_max = S * 2.0
 
@@ -165,19 +156,19 @@ def main():
     if S_max_zoom <= S_min_zoom:
         S_max_zoom = S_min_zoom + 1e-6
 
-      # Current price, intrinsic, time value, Greeks
-    res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
-    premium_per_unit_now = res_now["price"]          # fair long premium per unit
+    # ---------- Pricing and Greeks (LONG option) ----------
+    res_long = bs_price_greeks(S, K, T, r, sigma, opt_type)
+    premium_per_unit_long = res_long["price"]
 
-    # Signed premium for this position (positive = paid for long, negative = received for short)
-    signed_premium_per_unit_now = (
-        premium_per_unit_now if is_long else -premium_per_unit_now
-    )
+    # Position Greeks = long Greeks * +1 (long) or -1 (short)
+    res_pos = {g: (val * pos_sign if g in ["delta", "gamma", "vega", "theta", "rho"] else val)
+               for g, val in res_long.items()}
 
+    signed_premium_per_unit_now = premium_per_unit_long * pos_sign
     premium_total_now = signed_premium_per_unit_now * qty
 
     intrinsic_now, time_val_now = intrinsic_and_time_value(
-        S, K, opt_type, premium_per_unit_now
+        S, K, opt_type, premium_per_unit_long
     )
 
     st.subheader("Premium, intrinsic and time value (per unit)")
@@ -195,7 +186,6 @@ def main():
         f"**{premium_total_now:.4f}**"
     )
 
-    # --- Option moneyness banner (inserted immediately after the st.write) ---
     moneyness = option_moneyness(S, K, opt_type)
     st.markdown(
         f"<div style='font-size:20px; font-weight:bold; color:#ffffff; "
@@ -206,33 +196,28 @@ def main():
         unsafe_allow_html=True,
     )
 
-
-    # Payoff, P&L, premium vs underlying
+    # ---------- Payoff, P&L, premium vs underlying ----------
     st.subheader("Payoff and P&L at expiry")
 
-    # Grid over base range, chart zooms via sliders
     S_grid = np.linspace(base_min, base_max, 400)
 
-    # Fair value (long premium) vs S on grid, then sign it for position
     premium_grid_long = np.array(
         [bs_price_greeks(s_val, K, T, r, sigma, opt_type)["price"] for s_val in S_grid]
     )
-    premium_grid_signed = np.where(is_long, premium_grid_long, -premium_grid_long)
+    premium_grid_signed = premium_grid_long * pos_sign
 
-    # Long payoff, then convert to position payoff and P&L
     long_payoff = long_payoff_array(S_grid, K, opt_type, qty=qty)
-    position_sign = 1 if is_long else -1
-    position_payoff = position_sign * long_payoff
+    position_payoff = pos_sign * long_payoff
     pnl_expiry = pnl_from_long_payoff(
-        long_payoff, premium_per_unit_now, qty=qty, is_long=is_long
+        long_payoff, premium_per_unit_long, qty=qty, is_long=is_long
     )
 
     df = pd.DataFrame(
         {
             "S_expiry": S_grid,
-            "Position_payoff": position_payoff,        # long or short payoff
-            "PnL": pnl_expiry,                         # includes premium income/cost
-            "Premium_signed": premium_grid_signed * qty,  # position premium vs S (negative for shorts)
+            "Position_payoff": position_payoff,
+            "PnL": pnl_expiry,
+            "Premium_signed": premium_grid_signed * qty,
         }
     )
 
@@ -274,7 +259,6 @@ def main():
         )
         layers.append(premium_line)
 
-    # Strike line
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
@@ -282,7 +266,6 @@ def main():
     )
     layers.append(strike_line)
 
-    # Arrow at current S on P&L curve, if inside zoom window
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
@@ -328,53 +311,47 @@ def main():
 
     st.altair_chart(chart, use_container_width=True)
 
-    # ---------- Greeks numeric table ----------
-    st.subheader("Greeks (per unit at current underlying, long option)")
+    # ---------- Greeks numeric table (POSITION Greeks) ----------
+    st.subheader("Greeks (per unit for displayed position)")
 
     greeks_df = pd.DataFrame(
         {
             "Greek": ["Delta", "Gamma", "Vega", "Theta (per year)", "Rho"],
             "Value": [
-                res_now["delta"],
-                res_now["gamma"],
-                res_now["vega"],
-                res_now["theta"],
-                res_now["rho"],
+                res_pos["delta"],
+                res_pos["gamma"],
+                res_pos["vega"],
+                res_pos["theta"],
+                res_pos["rho"],
             ],
         }
     )
     st.table(greeks_df)
 
     # ---------- Greeks explanation table ----------
-    # Build text with current values interpolated
-    delta_val = res_now["delta"]
-    gamma_val = res_now["gamma"]
-    vega_val = res_now["vega"]
-    theta_val = res_now["theta"]
-    rho_val = res_now["rho"]
+    delta_val = res_pos["delta"]
+    gamma_val = res_pos["gamma"]
+    vega_val = res_pos["vega"]
+    theta_val = res_pos["theta"]
+    rho_val = res_pos["rho"]
 
     expl_df = pd.DataFrame(
         {
             "Greek": ["Delta", "Gamma", "Vega", "Theta", "Rho"],
             "Explanation": [
-                f"Delta = {delta_val:.4f}. Approximate change in option value "
-                f"for a 1-unit move in the underlying price. For example, if the underlying moves up by 1, "
-                f"the option value changes by about {delta_val:.4f}.",
-                f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying. "
-                f"A 1-unit move in the underlying changes delta by about {gamma_val:.4f}.",
-                f"Vega = {vega_val:.4f}. Sensitivity of option value to volatility. "
-                f"A 1 percentage-point increase in implied volatility changes the option value by roughly "
-                f"{vega_val/100.0:.4f} (per 1 vol point).",
-                f"Theta = {theta_val:.4f} per year. Sensitivity of option value to the passage of time, "
-                f"holding other inputs constant. Per day (divide Theta by 365) this is about {theta_val/365.0:.4f}.",
-                f"Rho = {rho_val:.4f}. Sensitivity of option value to the risk-free interest rate, and is 0% is used on Options on Forwards. "
-                f"A 1 percentage-point increase in the rate changes the option value by roughly "
-                f"{rho_val/100.0:.4f}.",
+                f"Delta = {delta_val:.4f}. Approximate change in P&L for a 1-unit move in the underlying, "
+                f"for this {position} {option_side} position.",
+                f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying.",
+                f"Vega = {vega_val:.4f}. Sensitivity of this position's value to volatility "
+                f"(per 1.00 = 100 vol points). Per 1 vol point ≈ {vega_val/100.0:.4f}.",
+                f"Theta = {theta_val:.4f} per year. Time decay for this position, "
+                f"≈ {theta_val/365.0:.4f} per day.",
+                f"Rho = {rho_val:.4f}. Sensitivity of this position's value to a 1.00 change "
+                f"in the risk-free rate; per 1 percentage point ≈ {rho_val/100.0:.4f}.",
             ],
         }
     )
 
-    # CSS for wrapping explanation text
     st.markdown(
         """
         <style>
@@ -394,11 +371,12 @@ def main():
         unsafe_allow_html=True,
     )
 
-    st.subheader("Greeks explanation")
+    st.subheader("Greeks explanation (for this position)")
     st.markdown(
         expl_df.to_html(classes="greeks-expl-table", index=False),
         unsafe_allow_html=True,
     )
+
 
 if __name__ == "__main__":
     main()
