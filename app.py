@@ -56,6 +56,26 @@ def intrinsic_and_time_value(S, K, option_type, model_price):
     time_value = max(model_price - intrinsic, 0.0)
     return intrinsic, time_value
 
+def option_moneyness(S, K, option_type):
+    """
+    Return 'ITM', 'ATM', or 'OTM' for the current option.
+    option_type: 'call' or 'put'
+    """
+    eps = 1e-6  # small tolerance
+    if option_type == "call":
+        if S > K + eps:
+            return "ITM"
+        elif abs(S - K) <= eps:
+            return "ATM"
+        else:
+            return "OTM"
+    else:  # put
+        if S < K - eps:
+            return "ITM"
+        elif abs(S - K) <= eps:
+            return "ATM"
+        else:
+            return "OTM"
 
 def long_payoff_array(S_grid, K, option_type, qty=1.0):
     """Long option payoff at expiry for each S on grid (per specified quantity)."""
@@ -148,6 +168,24 @@ def main():
     # Current price, intrinsic, time value, Greeks
     res_now = bs_price_greeks(S, K, T, r, sigma, opt_type)
     premium_per_unit_now = res_now["price"]          # always the long fair value per unit
+
+    st.write(
+    f"Total premium for the position ({position} {option_side}, qty {qty:g}): "
+    f"**{premium_total_now:.4f}**"
+    )
+
+    # --- Option moneyness banner ---
+    moneyness = option_moneyness(S, K, opt_type)
+    st.markdown(
+        f"<div style='font-size:20px; font-weight:bold; color:#ffffff; "
+        f"background-color:#444444; padding:6px 10px; "
+        f"border-radius:4px; display:inline-block;'>"
+        f"This option is {moneyness} ("
+        f"{'In-the-money' if moneyness=='ITM' else 'At-the-money' if moneyness=='ATM' else 'Out-of-the-money'}"
+        f")</div>",
+        unsafe_allow_html=True,
+    )
+
     # Signed premium for this position (positive = cash outflow for long, negative = inflow for short)
     signed_premium_per_unit_now = premium_per_unit_now if is_long else -premium_per_unit_now
 
