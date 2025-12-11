@@ -89,11 +89,11 @@ def pnl_from_long_payoff(long_payoff, premium_per_unit_now, qty=1.0, is_long=Tru
 # ---------- Streamlit app ----------
 
 def main():
-    st.set_page_config(page_title="Oil Option Payoff & Greeks - by Julian@energovis.co.uk", layout="wide")
+    st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
     st.title("Oil Option Payoff, P&L and Greeks")
 
     # Sidebar inputs
-    st.sidebar.header("Option inputs")
+    st.sidebar.header("Option inputs by Julian@energovis.co.uk")
 
     S = st.sidebar.number_input(
         "Current oil price (S)", value=80.0, min_value=0.01, key="S_input"
