@@ -131,6 +131,9 @@ def main():
     show_pnl_line = st.sidebar.checkbox(
         "Show P&L line (orange)", value=True, key="show_pnl_line"
     )
+    show_pnl_shading = st.sidebar.checkbox(
+        "Shade P&L area (red/green)", value=True, key="show_pnl_shading"
+    )
 
     opt_type = "call" if option_side == "Call" else "put"
     is_long = position == "Long"
@@ -257,6 +260,10 @@ def main():
         }
     )
 
+    # Split P&L into positive and negative parts for shading
+    df["PnL_pos"] = np.where(df["PnL"] > 0, df["PnL"], 0.0)
+    df["PnL_neg"] = np.where(df["PnL"] < 0, df["PnL"], 0.0)
+
     df_zoom = df[(df["S_expiry"] >= S_min_zoom) & (df["S_expiry"] <= S_max_zoom)]
 
     base = alt.Chart(df_zoom).encode(
@@ -283,9 +290,30 @@ def main():
         ],
     )
 
-    # Start layers with payoff only; add P&L conditionally
+    # Shaded areas for P&L relative to 0
+    pnl_area_pos = base.mark_area(
+        color="green",
+        opacity=0.25
+    ).encode(
+        y=alt.Y("PnL_pos:Q", title="P&L"),
+        y2=alt.value(0)
+    )
+
+    pnl_area_neg = base.mark_area(
+        color="red",
+        opacity=0.25
+    ).encode(
+        y=alt.Y("PnL_neg:Q", title="P&L"),
+        y2=alt.value(0)
+    )
+
+    # Start layers with payoff only; add shading and P&L conditionally
     layers = [payoff_line]
-    
+
+    if show_pnl_shading:
+        layers.append(pnl_area_pos)
+        layers.append(pnl_area_neg)
+
     if show_pnl_line:
         layers.append(pnl_line)
 
@@ -298,7 +326,8 @@ def main():
             ],
         )
         layers.append(premium_line)
-    
+
+    # Strike line
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
@@ -306,7 +335,7 @@ def main():
     )
     layers.append(strike_line)
 
-    # ---- Strike label at top of graph ----
+    # Strike label at top of graph
     strike_label_data = pd.DataFrame({
         "K": [K],
         "label": [f"Strike 'K' {K:g}"]
@@ -330,7 +359,7 @@ def main():
     )
     layers.append(strike_label)
 
-
+    # Arrow showing current S and P&L at expiry
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
@@ -443,5 +472,4 @@ def main():
     )
 
 
-if __name__ == "__main__":
-    main()
+if 
