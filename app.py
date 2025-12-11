@@ -90,10 +90,10 @@ def pnl_from_long_payoff(long_payoff, premium_per_unit_now, qty=1.0, is_long=Tru
 
 def main():
     st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
-    st.title("Oil Option Payoff, P&L and Greeks")
+    st.title("Oil Option Payoff, P&L and Greeks - by J Keites")
 
     # Sidebar inputs
-    st.sidebar.header("Option inputs by Julian@energovis.co.uk")
+    st.sidebar.header("Vanilla European Option inputs")
 
     S = st.sidebar.number_input(
         "Current oil price (S)", value=80.0, min_value=0.01, key="S_input"
