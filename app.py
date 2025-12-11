@@ -1,7 +1,3 @@
-
-
- 
-
 import numpy as np
 import pandas as pd
 import altair as alt
@@ -287,7 +283,11 @@ def main():
         ],
     )
 
-    layers = [payoff_line, pnl_line]
+    # Start layers with payoff only; add P&L conditionally
+    layers = [payoff_line]
+    
+    if show_pnl_line:
+        layers.append(pnl_line)
 
     if show_premium_line:
         premium_line = base.mark_line(color="green", strokeDash=[4, 2]).encode(
@@ -297,10 +297,7 @@ def main():
                 alt.Tooltip("Premium_signed:Q", title="Position premium vs S"),
             ],
         )
-         # Start layers with payoff only; add P&L conditionally
-        layers = [payoff_line]
-        if show_pnl_line:
-            layers.append(pnl_line)
+        layers.append(premium_line)
     
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
