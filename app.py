@@ -1,3 +1,7 @@
+
+
+ 
+
 import numpy as np
 import pandas as pd
 import altair as alt
@@ -127,6 +131,9 @@ def main():
     )
     show_premium_line = st.sidebar.checkbox(
         "Show premium vs underlying", value=True, key="show_premium_line"
+    )
+    show_pnl_line = st.sidebar.checkbox(
+        "Show P&L line (orange)", value=True, key="show_pnl_line"
     )
 
     opt_type = "call" if option_side == "Call" else "put"
@@ -290,8 +297,11 @@ def main():
                 alt.Tooltip("Premium_signed:Q", title="Position premium vs S"),
             ],
         )
-        layers.append(premium_line)
-
+         # Start layers with payoff only; add P&L conditionally
+        layers = [payoff_line]
+        if show_pnl_line:
+            layers.append(pnl_line)
+    
     strike_line = (
         alt.Chart(pd.DataFrame({"K": [K]}))
         .mark_rule(color="red", strokeDash=[4, 4])
