@@ -198,7 +198,7 @@ def main():
             color:#ffffff;
         ">
           <div style="font-size:22px; font-weight:bold;">
-            {position} {option_side} @ {K:g}
+            {position} {K:g} {option_side}
           </div>
           <div style="font-size:16px;">
             Spot: <b>{S:g}</b> &nbsp;|&nbsp;
