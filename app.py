@@ -306,6 +306,31 @@ def main():
     )
     layers.append(strike_line)
 
+    # ---- Strike label at top of graph ----
+    strike_label_data = pd.DataFrame({
+        "K": [K],
+        "label": [f"Strike 'K' {K:g}"]
+    })
+
+    strike_label = (
+        alt.Chart(strike_label_data)
+        .mark_text(
+            align="center",
+            baseline="bottom",
+            dy=-5,
+            color="red",
+            fontSize=12,
+            fontWeight="bold",
+        )
+        .encode(
+            x="K:Q",
+            y=alt.value(0),          # top of plotting area
+            text="label:N",
+        )
+    )
+    layers.append(strike_label)
+
+
     idx_closest = int(np.abs(S_grid - S).argmin())
     S_now = float(S_grid[idx_closest])
     pnl_now = float(pnl_expiry[idx_closest])
