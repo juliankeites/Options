@@ -89,7 +89,7 @@ def pnl_from_long_payoff(long_payoff, premium_per_unit_now, qty=1.0, is_long=Tru
 # ---------- Streamlit app ----------
 
 def main():
-    st.set_page_config(page_title="Oil Option Payoff & Greeks", layout="wide")
+    st.set_page_config(page_title="Vanilla European Oil Option Payoff & Greeks", layout="wide")
     st.title("Oil Option Payoff, P&L and Greeks - by J Keites linkedin.com/in/jkeites")
 
     # Sidebar inputs
