@@ -415,7 +415,7 @@ def main():
                 res_pos["delta"],
                 res_pos["gamma"],
                 res_pos["vega"]/100,
-                res_pos["theta"],
+                res_pos["theta"]/365,
                 res_pos["rho"]/100,
             ],
         }
