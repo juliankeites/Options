@@ -414,9 +414,9 @@ def main():
             "Value": [
                 res_pos["delta"],
                 res_pos["gamma"],
-                res_pos["vega"],
+                res_pos["vega"]/100,
                 res_pos["theta"],
-                res_pos["rho"],
+                res_pos["rho"]/100,
             ],
         }
     )
