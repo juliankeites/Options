@@ -406,7 +406,7 @@ def main():
     st.altair_chart(chart, use_container_width=True)
 
     # ---------- Greeks numeric table (POSITION Greeks) ----------
-    st.subheader("Greeks (per unit for displayed position)")
+    st.subheader("Greeks (per unit for this Option)")
 
     greeks_df = pd.DataFrame(
         {
@@ -433,12 +433,12 @@ def main():
         {
             "Greek": ["Delta", "Gamma", "Vega", "Theta", "Rho"],
             "Explanation": [
-                f"Delta = {delta_val:.4f}. Approximate change in P&L for a 1 $/bbl move in "
-                f"the underlying, for this {position} {option_side} position.",
+                f"Delta = {delta_val:.4f}. Sensitivity of this position's value to a 1 $/bbl move in "
+                f"the underlying price, for this {position} {option_side} position.",
                 f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying.",
                 f"Vega = {vega_val/100:.4f}. Sensitivity of this position's value to volatility "
                 f"per 1%. Per 1 vol basis point (1/100 of 1%) ≈ {vega_val/10000.0:.5f}.",
-                f"Theta = {theta_val:.4f} per year. Time decay for this position, "
+                f"Theta = {theta_val:.4f} per year. Sensitivity of this position's value to Time Decay, "
                 f"≈ {theta_val/365.0:.4f} per day.",
                 f"Rho = {rho_val:.4f}. Sensitivity of this position's value to a 1%  change "
                 f"in the risk-free rate; per 1 basis (1/100 of 1%) point ≈ {rho_val/100.0:.4f}.",
@@ -465,7 +465,7 @@ def main():
         unsafe_allow_html=True,
     )
 
-    st.subheader("Greeks explanation (for this position)")
+    st.subheader("Greeks explanation")
     st.markdown(
         expl_df.to_html(classes="greeks-expl-table", index=False),
         unsafe_allow_html=True,
