@@ -406,7 +406,7 @@ def main():
     st.altair_chart(chart, use_container_width=True)
 
     # ---------- Greeks numeric table (POSITION Greeks) ----------
-    st.subheader("Greeks (per unit for this Option)")
+    st.subheader("Greeks (per bbl) for the selected Option")
 
     greeks_df = pd.DataFrame(
         {
@@ -440,8 +440,8 @@ def main():
                 f"per 1%; per 1 basis (1/100 of 1%) point  ≈ {vega_val/10000.0:.5f}.",
                 f"Theta = {theta_val:.4f} per year. Sensitivity of this position's value to Time Decay, "
                 f"≈ {theta_val/365.0:.4f} per day.",
-                f"Rho = {rho_val:.4f}. Sensitivity of this position's value to a 1%  change "
-                f"in the risk-free rate; per 1 basis (1/100 of 1%) point ≈ {rho_val/100.0:.4f}.",
+                f"Rho = {rho_val/100:.4f}. Sensitivity of this position's value to a 1%  change "
+                f"in the risk-free rate; per 1 basis (1/100 of 1%) point ≈ {rho_val/10000.0:.4f}.",
             ],
         }
     )
