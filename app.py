@@ -436,8 +436,8 @@ def main():
                 f"Delta = {delta_val:.4f}. Approximate change in P&L for a 1 $/bbl move in "
                 f"the underlying, for this {position} {option_side} position.",
                 f"Gamma = {gamma_val:.4f}. Rate of change of delta with respect to the underlying.",
-                f"Vega = {vega_val:.4f}. Sensitivity of this position's value to volatility "
-                f"per 100%. Per 1 vol point (1/100 of 1%) ≈ {vega_val/1000.0:.4f}.",
+                f"Vega = {vega_val/100:.4f}. Sensitivity of this position's value to volatility "
+                f"per 1%. Per 1 vol basis point (1/100 of 1%) ≈ {vega_val/10000.0:.4f}.",
                 f"Theta = {theta_val:.4f} per year. Time decay for this position, "
                 f"≈ {theta_val/365.0:.4f} per day.",
                 f"Rho = {rho_val:.4f}. Sensitivity of this position's value to a 1%  change "
